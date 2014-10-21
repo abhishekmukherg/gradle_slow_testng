@@ -1,38 +1,42 @@
 apply plugin: 'java'
+apply plugin: 'idea'
 
 sourceSets {
     testng
 }
 
+configurations {
+    testngCompile.extendsFrom compile
+    testngRuntime.extendsFrom testngCompile, runtime
+}
+
 dependencies {
     testngCompile 'org.testng:testng:6.8.8'
+    testngCompile sourceSets.main.output
 }
 
 repositories {
     mavenCentral()
 }
 
-def generatedResources = "$buildDir/gen/main"
+def generatedSources = "gen/main"
 
 task generateMainClasses {
-    outputs.dir generatedResources
+    outputs.dir generatedSources
     doLast {
-        (1..10).each { rootNum ->
-            (1..10).each { subNum ->
-                (1..10).each { classNum ->
-                    def file = file("${generatedResources}/a${rootNum}/b${subNum}/C${classNum}.java")
-                    file.parentFile.mkdirs()
-                    file.write("""package a${rootNum}.b${subNum};
+        [(1..10), (1..10), (1..10), (1..10)].combinations().each {
+                rootNum, p1, p2, classNum ->
+            def file = file("$generatedSources/a$rootNum/b${p1}/c${p2}/Z${classNum}.java")
+            file.parentFile.mkdirs()
+            file.write("""package a${rootNum}.b${p1}.c${p2};
 
-                    public class C${classNum} {
-                        public int classNum;
-                        public C${classNum}() {
-                            this.classNum = ${classNum};
-                        }
-                    }
-                    """)
+            public class Z${classNum} {
+                public int classNum;
+                public Z${classNum}() {
+                    this.classNum = ${classNum};
                 }
             }
+            """)
         }
     }
 }
@@ -43,6 +47,7 @@ clean.dependsOn cleanGenerateMainClasses
 task testng(type: Test) {
     useTestNG() {
         listeners << 'testing.Listener'
+        suites file('src/testng/resources/unit.xml')
     }
     testClassesDir = sourceSets.testng.output.classesDir
     classpath = sourceSets.testng.runtimeClasspath

@@ -1,0 +1,9 @@
+<suite name="Criteria Tests" parallel="tests" verbose="1" >
+    <test name="Criteria" thread-count="5" >
+        <packages>
+            <package name="testing.*" />
+            <package name="a1.*" />
+        </packages>
+    </test>
+</suite>
+
