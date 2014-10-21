@@ -2,7 +2,13 @@ apply plugin: 'java'
 apply plugin: 'idea'
 
 sourceSets {
-    testng
+    main {
+        java.srcDir 'gen/main/java'
+    }
+    testng {
+        java.srcDir 'gen/testng/java'
+        resources.srcDir 'gen/testng/resources'
+    }
 }
 
 configurations {
@@ -11,7 +17,6 @@ configurations {
 }
 
 dependencies {
-    compile 'junit:junit:3.8.1'
     testngCompile 'org.testng:testng:6.8.8'
     testngCompile sourceSets.main.output
 }
@@ -22,62 +27,144 @@ repositories {
 
 def genDir = "gen"
 
+import groovy.text.SimpleTemplateEngine
+
 task generateMainClasses {
-    ext.outDir = "$genDir/main"
+    ext.outDir = "$genDir/main/java"
+    ext.fileTemplate = '''package a${rootNum}.b${p1}.c${p2};
+
+    public class Z${classNum} {
+        public int classNum;
+        public Z${classNum}() {
+            this.classNum = ${classNum};
+        }
+    }
+    '''
+
     outputs.dir outDir
+    inputs.property 'fileTemplate', fileTemplate
+
     doLast {
+        def engine = new SimpleTemplateEngine()
+        def templ = engine.createTemplate(fileTemplate)
         [(1..10), (1..10), (1..10), (1..10)].combinations().each {
                 rootNum, p1, p2, classNum ->
             def file = file("$outDir/a$rootNum/b${p1}/c${p2}/Z${classNum}.java")
             file.parentFile.mkdirs()
-            file.write("""package a${rootNum}.b${p1}.c${p2};
-
-            public class Z${classNum} {
-                public int classNum;
-                public Z${classNum}() {
-                    this.classNum = ${classNum};
-                }
-            }
-            """)
+            file.write(templ.make([
+                rootNum  : rootNum,
+                p1       : p1,
+                p2       : p2,
+                classNum : classNum,
+            ]).toString())
         }
     }
 }
 
-compileJava.source generateMainClasses.outputs.files, sourceSets.main.java
-clean.dependsOn cleanGenerateMainClasses
+compileJava.dependsOn generateMainClasses
+//compileJava.source generateMainClasses.outputs.files, sourceSets.main.java
 
 task generateTestClasses {
-    ext.outDir = "$genDir/testng"
+    ext.outDir = "$genDir/testng/java"
+    ext.fileTemplate = '''package a${rootNum}.b${p1}.c${p2};
+
+    import org.testng.Assert;
+    import org.testng.annotations.Test;
+
+    public class Z${classNum}Test {
+        @Test
+        public void testName() {
+            Assert.assertEquals(new a${rootNum}.b${p1}.c${p2}.Z${classNum}().classNum, ${classNum});
+        }
+    }
+    '''
+
     outputs.dir outDir
+    inputs.property 'fileTemplate', fileTemplate
+
     doLast {
+        def engine = new SimpleTemplateEngine()
+        def templ = engine.createTemplate(fileTemplate)
         [(1..10), (1..10), (1..10), (1..10)].combinations().each {
                 rootNum, p1, p2, classNum ->
             def file = file("$outDir/a$rootNum/b${p1}/c${p2}/Z${classNum}Test.java")
             file.parentFile.mkdirs()
-            file.write("""package a${rootNum}.b${p1}.c${p2};
-
-            import org.testng.Assert;
-            import org.testng.annotations.Test;
-
-            public class Z${classNum}Test {
-                @Test
-                public void testName() {
-                    Assert.assertEquals(new a${rootNum}.b${p1}.c${p2}.Z${classNum}().classNum, ${classNum});
-                }
-            }
-            """)
+            file.write(templ.make([
+                rootNum  : rootNum,
+                p1       : p1,
+                p2       : p2,
+                classNum : classNum,
+            ]).toString())
         }
     }
 }
-compileTestngJava.source generateTestClasses.outputs.files, sourceSets.testng.java
+compileTestngJava.dependsOn generateTestClasses
+
+def testConfigFile(outDir, rootNum, p1) {
+    return file("$outDir/${rootNum}/${p1}.xml")
+}
+
+task generateTestConfig {
+    ext.outDir = "$genDir/testng/resources"
+    ext.fileTemplate = '''<suite name="Blah${rootNum}_${p1}" parallel="tests" verbose="1" >
+        <test name="Blah${rootNum}_${p1}" thread-count="5" >
+            <packages>
+                <package name="a${rootNum}.b${p1}.c1" />
+                <package name="a${rootNum}.b${p1}.c2" />
+                <package name="a${rootNum}.b${p1}.c2" />
+                <package name="a${rootNum}.b${p1}.c3" />
+                <package name="a${rootNum}.b${p1}.c4" />
+                <package name="a${rootNum}.b${p1}.c5" />
+                <package name="a${rootNum}.b${p1}.c6" />
+                <package name="a${rootNum}.b${p1}.c7" />
+                <package name="a${rootNum}.b${p1}.c8" />
+                <package name="a${rootNum}.b${p1}.c9" />
+                <package name="a${rootNum}.b${p1}.c10" />
+            </packages>
+        </test>
+    </suite>
+    '''
+
+    outputs.dir outDir
+    inputs.property 'fileTemplate', fileTemplate
+
+    doLast {
+        def engine = new SimpleTemplateEngine()
+        def templ = engine.createTemplate(fileTemplate)
+        [(1..10), (1..10)].combinations().each {
+                rootNum, p1 ->
+            def file = testConfigFile(outDir, rootNum, p1)
+            file.parentFile.mkdirs()
+            file.write(templ.make([
+                rootNum  : rootNum,
+                p1       : p1,
+            ]).toString())
+        }
+    }
+}
 
 task testng(type: Test) {
+    ext.outDir = "$genDir/testng/resources"
     useTestNG() {
         listeners << 'testing.Listener'
         suites file('src/testng/resources/unit.xml')
+        [(1..10), (1..10)].combinations().each {
+                rootNum, p1 ->
+            def file = testConfigFile(outDir, rootNum, p1)
+            suites file
+        }
     }
     maxHeapSize = '6g'
     jvmArgs '-XX:MaxPermSize=512m'
     testClassesDir = sourceSets.testng.output.classesDir
     classpath = sourceSets.testng.runtimeClasspath
 }
+
+testng.dependsOn generateTestConfig
+processTestngResources.dependsOn generateTestConfig
+
+task cleanGeneratedFiles(type: Delete) {
+    delete 'gen'
+}
+
+clean.dependsOn cleanGeneratedFiles
