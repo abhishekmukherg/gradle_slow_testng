@@ -11,6 +11,7 @@ configurations {
 }
 
 dependencies {
+    compile 'junit:junit:3.8.1'
     testngCompile 'org.testng:testng:6.8.8'
     testngCompile sourceSets.main.output
 }
@@ -19,14 +20,15 @@ repositories {
     mavenCentral()
 }
 
-def generatedSources = "gen/main"
+def genDir = "gen"
 
 task generateMainClasses {
-    outputs.dir generatedSources
+    ext.outDir = "$genDir/main"
+    outputs.dir outDir
     doLast {
         [(1..10), (1..10), (1..10), (1..10)].combinations().each {
                 rootNum, p1, p2, classNum ->
-            def file = file("$generatedSources/a$rootNum/b${p1}/c${p2}/Z${classNum}.java")
+            def file = file("$outDir/a$rootNum/b${p1}/c${p2}/Z${classNum}.java")
             file.parentFile.mkdirs()
             file.write("""package a${rootNum}.b${p1}.c${p2};
 
@@ -44,11 +46,38 @@ task generateMainClasses {
 compileJava.source generateMainClasses.outputs.files, sourceSets.main.java
 clean.dependsOn cleanGenerateMainClasses
 
+task generateTestClasses {
+    ext.outDir = "$genDir/testng"
+    outputs.dir outDir
+    doLast {
+        [(1..10), (1..10), (1..10), (1..10)].combinations().each {
+                rootNum, p1, p2, classNum ->
+            def file = file("$outDir/a$rootNum/b${p1}/c${p2}/Z${classNum}Test.java")
+            file.parentFile.mkdirs()
+            file.write("""package a${rootNum}.b${p1}.c${p2};
+
+            import org.testng.Assert;
+            import org.testng.annotations.Test;
+
+            public class Z${classNum}Test {
+                @Test
+                public void testName() {
+                    Assert.assertEquals(new a${rootNum}.b${p1}.c${p2}.Z${classNum}().classNum, ${classNum});
+                }
+            }
+            """)
+        }
+    }
+}
+compileTestngJava.source generateTestClasses.outputs.files, sourceSets.testng.java
+
 task testng(type: Test) {
     useTestNG() {
         listeners << 'testing.Listener'
         suites file('src/testng/resources/unit.xml')
     }
+    maxHeapSize = '6g'
+    jvmArgs '-XX:MaxPermSize=512m'
     testClassesDir = sourceSets.testng.output.classesDir
     classpath = sourceSets.testng.runtimeClasspath
 }
