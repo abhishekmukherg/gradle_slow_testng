@@ -1,0 +1,49 @@
+apply plugin: 'java'
+
+sourceSets {
+    testng
+}
+
+dependencies {
+    testngCompile 'org.testng:testng:6.8.8'
+}
+
+repositories {
+    mavenCentral()
+}
+
+def generatedResources = "$buildDir/gen/main"
+
+task generateMainClasses {
+    outputs.dir generatedResources
+    doLast {
+        (1..10).each { rootNum ->
+            (1..10).each { subNum ->
+                (1..10).each { classNum ->
+                    def file = file("${generatedResources}/a${rootNum}/b${subNum}/C${classNum}.java")
+                    file.parentFile.mkdirs()
+                    file.write("""package a${rootNum}.b${subNum};
+
+                    public class C${classNum} {
+                        public int classNum;
+                        public C${classNum}() {
+                            this.classNum = ${classNum};
+                        }
+                    }
+                    """)
+                }
+            }
+        }
+    }
+}
+
+compileJava.source generateMainClasses.outputs.files, sourceSets.main.java
+clean.dependsOn cleanGenerateMainClasses
+
+task testng(type: Test) {
+    useTestNG() {
+        listeners << 'testing.Listener'
+    }
+    testClassesDir = sourceSets.testng.output.classesDir
+    classpath = sourceSets.testng.runtimeClasspath
+}
