@@ -29,6 +29,9 @@ def genDir = "gen"
 
 import groovy.text.SimpleTemplateEngine
 
+/////////////////////////////////////
+// Generate a bunch of class files like a1.b1.c1.Z1
+/////////////////////////////////////
 task generateMainClasses {
     ext.outDir = "$genDir/main/java"
     ext.fileTemplate = '''package a${rootNum}.b${p1}.c${p2};
@@ -62,8 +65,12 @@ task generateMainClasses {
 }
 
 compileJava.dependsOn generateMainClasses
-//compileJava.source generateMainClasses.outputs.files, sourceSets.main.java
 
+/////////////////////////////////////
+// Generate a bunch of test files for each of the class files above
+//
+// They'll be located in a1.b1.c1.Z1Test
+/////////////////////////////////////
 task generateTestClasses {
     ext.outDir = "$genDir/testng/java"
     ext.fileTemplate = '''package a${rootNum}.b${p1}.c${p2};
@@ -104,6 +111,13 @@ def testConfigFile(outDir, rootNum, p1) {
     return file("$outDir/${rootNum}/${p1}.xml")
 }
 
+/////////////////////////////////////
+// Generate test config files
+//
+// This is the important part that slows it down, i think
+// This generates 100 config files in a1/b1.xml that have all
+// the packages within that file
+/////////////////////////////////////
 task generateTestConfig {
     ext.outDir = "$genDir/testng/resources"
     ext.fileTemplate = '''<suite name="Blah${rootNum}_${p1}" parallel="tests" verbose="1" >
